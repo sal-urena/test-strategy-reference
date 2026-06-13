@@ -79,21 +79,27 @@ app/
   models.py     # User / Item tables + UserCreate / ItemCreate request bodies
   auth.py       # bcrypt hashing + JWT create/decode
   main.py       # routes + HTTPBearer + get_current_user dependency
-tests/          # pytest + httpx suite (in progress)
+tests/
+  unit/         # pure-function tests for auth.py (no HTTP, no DB)
+  api/          # httpx tests over the running app (planned)
 ```
 
 ## Testing
 
-The pytest + httpx suite is the portfolio deliverable. Planned coverage:
+The pytest + httpx suite is the portfolio deliverable, organized into two layers — and the
+**layering is the strategy**. The full rationale (why each concern lives where, where a given bug
+lands, and what's deliberately out of scope) is in **[TEST_STRATEGY.md](TEST_STRATEGY.md)**.
 
-- Happy-path CRUD lifecycle (register → login → create → read → update → delete)
-- **403 vs 401** — missing header vs. malformed/expired token
-- **404 owner-scoping** — user B cannot see user A's item
-- **Forged `owner_id`** in the request body is ignored
-- **bcrypt 72-byte** password-length boundary
+- **Unit layer** (`tests/unit/`, implemented) — `auth.py` in isolation: hash/verify round-trip and
+  rejection, salting, JWT create→decode round-trip, expiry, malformed-token handling, and bcrypt's
+  >72-byte `ValueError` boundary.
+- **API layer** (`tests/api/`, planned) — owner-scoped CRUD over `httpx` with an overridden in-memory
+  database: happy-path lifecycle, **403 vs 401** (missing header vs. invalid token), **404
+  owner-scoping** (user B can't see user A's item), and **forged `owner_id`** ignored.
 
 ```bash
-python -m pytest          # run from the project root
+python -m pytest                 # run everything from the project root
+python -m pytest tests/unit -v   # run a single layer
 ```
 
 ## Notes & deliberate trade-offs
