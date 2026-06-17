@@ -1,7 +1,8 @@
- fastapi
- uvicorn
- sqlmodel
- python-jose[cryptography]
- httpx
- pytest
- bcrypt
+fastapi
+uvicorn
+sqlmodel
+python-jose[cryptography]
+httpx
+pytest
+pytest-asyncio
+bcrypt
