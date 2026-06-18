@@ -1,4 +1,4 @@
-# Test Strategy — sdet-demo-api
+# Test Strategy — Reference API SUT
 
 <!-- Guidance prompts are in HTML comments so they won't render on GitHub if you miss one.
      Delete each comment as you replace it with your own prose. -->

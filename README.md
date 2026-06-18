@@ -1,8 +1,9 @@
-# sdet-demo-api
+# Test Strategy Reference
 
-A small, deliberately security-conscious REST API built as a **system-under-test (SUT)** for an
-API automation portfolio. The application itself is the supporting cast; the headline artifact is the
-**pytest + httpx** suite written against it (see [Testing](#testing)).
+A small, deliberately security-conscious REST API built as a **system-under-test (SUT)** for a
+test-architecture portfolio. The application itself is the supporting cast; the headline artifacts are the
+**pytest + httpx** suite written against it and the [`TEST_STRATEGY.md`](TEST_STRATEGY.md) that documents
+the design decisions behind it (see [Testing](#testing)).
 
 The API implements JWT-authenticated user accounts and **owner-scoped CRUD** on items — enough surface
 to demonstrate real API-testing concerns: authentication, authorization, negative paths, and
