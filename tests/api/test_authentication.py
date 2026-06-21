@@ -21,11 +21,11 @@ async def test_login_successful_with_valid_credentials(client):
     await client.post(url="/register", json=json_body)
     response = await client.post(url="/login", json=json_body)
     assert response.status_code == 200
-    reponse_body = response.json()
-    assert reponse_body["token_type"] == "bearer"
-    assert reponse_body["access_token"]
+    response_body = response.json()
+    assert response_body["token_type"] == "bearer"
+    assert response_body["access_token"]
 
-async def test_invalid_password__and_bad_username_returns_401(client):
+async def test_invalid_login_credentials_401(client):
     username = "test_user"
     json_body ={
         "username": username,
@@ -48,5 +48,24 @@ async def test_invalid_password__and_bad_username_returns_401(client):
     assert response2.status_code ==401
     response_body2 = response2.json()
     assert response_body2["detail"]=="Invalid username or password"
-    assert response_body["detail"]==response_body2["detail"]
+
+async def test_indistinguishable_messaging_for_invalid_username_or_password(client):
+    username = "test_user"
+    json_body ={
+        "username": username,
+        "password": "pass1234"
+        }
+    json_body_wrong_password ={
+        "username": username,
+        "password": "wrongpassword"
+        }
+    await client.post(url="/register", json=json_body)
+    response = await client.post(url="/login", json=json_body_wrong_password)
+    json_body_wrong_username ={
+        "username": username+"1",
+        "password": "pass1234"
+        }
+    response2 = await client.post(url="/login", json=json_body_wrong_username)
+    assert response.json() ==response2.json()
+    assert response.status_code == response2.status_code
 

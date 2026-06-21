@@ -2,6 +2,7 @@ import pytest
 from sqlmodel import Session, SQLModel, create_engine
 from sqlmodel.pool import StaticPool
 from httpx import AsyncClient, ASGITransport
+from typing import NamedTuple
 
 from app.database import get_session
 from app.main import app
@@ -31,3 +32,25 @@ async def client(session):
          yield client
     app.dependency_overrides.clear()
 
+class AuthedUser(NamedTuple):
+     id: int
+     headers:dict
+
+@pytest.fixture
+def make_user(client):
+    async def _make(username,password):
+        json_body ={
+            "username": username,
+            "password": password
+            }
+        registered_response =await client.post(url=("/register"), json=json_body)
+        assert registered_response.status_code==200
+        registered_response_json = registered_response.json()
+        user_id =registered_response_json["id"]
+        response = await client.post(url="/login", json=json_body)
+        assert response.status_code ==200
+        response_body = response.json()
+        bearer_token = response_body["access_token"]
+        user = AuthedUser(id=user_id, headers={"Authorization": f"Bearer {bearer_token}"})
+        return user
+    return _make
