@@ -36,7 +36,7 @@ test_hash_password_over_boundary
 ### 3.2 API layer (`tests/api/`) — planned
 
 <!-- What it WILL cover and why these are API, not unit, concerns:
-     owner-scoping (404), 403-vs-401, forged owner_id, login uniformity.
+     owner-scoping (404), 401, forged owner_id, login uniformity.
      Infra decisions and their rationale:
        - in-memory SQLite + StaticPool — why StaticPool is required
        - dependency_overrides on get_session — why (module-level engine hits the real DB)

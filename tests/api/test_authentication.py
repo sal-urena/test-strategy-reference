@@ -69,3 +69,14 @@ async def test_indistinguishable_messaging_for_invalid_username_or_password(clie
     assert response.json() ==response2.json()
     assert response.status_code == response2.status_code
 
+async def test_401_when_header_is_invalid_token(client):
+    get_item = await client.get("/items/1", headers={"Authorization":"Bearer bad_token"})
+    assert get_item.status_code == 401
+    get_item_json = get_item.json()
+    assert get_item_json["detail"] == "Invalid or expired token"
+
+async def test_401_when_header_is_missing(client):
+    get_item = await client.get("/items/1")
+    assert get_item.status_code == 401
+    get_item_json = get_item.json()
+    assert get_item_json["detail"] == "Not authenticated"

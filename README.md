@@ -67,9 +67,11 @@ These are intentional and are the most interesting things to test:
   valid IDs (existence disclosure).
 - **Uniform 401 on login.** Bad username and bad password return the identical 401 — no user-enumeration
   oracle.
-- **Two distinct unauthenticated responses.** A *missing* `Authorization` header is rejected by the
-  `HTTPBearer` scheme (**403**) before any handler runs; a *present but invalid/expired* token is rejected
-  inside `get_current_user` (**401**). Tests assert both.
+- **Unauthenticated responses.** A *missing* `Authorization` header is rejected by the
+  `HTTPBearer` scheme (**401**) before any handler runs; a *present but invalid/expired* token is rejected
+  inside `get_current_user` (**401**). The two guard layers are distinguished by their `detail`
+  message (`"Not authenticated"` vs. `"Invalid or expired token"`), not by status code — uniform 401,
+  no status oracle. Tests assert both, checking the message to confirm each path is exercised.
 - **Passwords are bcrypt-hashed**, never stored or returned in plaintext.
 
 ## Project layout
@@ -82,7 +84,7 @@ app/
   main.py       # routes + HTTPBearer + get_current_user dependency
 tests/
   unit/         # pure-function tests for auth.py (no HTTP, no DB)
-  api/          # httpx tests over the running app (planned)
+  api/          # httpx tests over the running app (implemented)
 ```
 
 ## Testing
@@ -94,8 +96,8 @@ lands, and what's deliberately out of scope) is in **[TEST_STRATEGY.md](TEST_STR
 - **Unit layer** (`tests/unit/`, implemented) — `auth.py` in isolation: hash/verify round-trip and
   rejection, salting, JWT create→decode round-trip, expiry, malformed-token handling, and bcrypt's
   >72-byte `ValueError` boundary.
-- **API layer** (`tests/api/`, planned) — owner-scoped CRUD over `httpx` with an overridden in-memory
-  database: happy-path lifecycle, **403 vs 401** (missing header vs. invalid token), **404
+- **API layer** (`tests/api/`, implemented) — owner-scoped CRUD over `httpx` with an overridden in-memory
+  database: happy-path lifecycle, **401** (missing header vs. invalid token), **404
   owner-scoping** (user B can't see user A's item), and **forged `owner_id`** ignored.
 
 ```bash
