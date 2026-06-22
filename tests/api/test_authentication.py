@@ -11,6 +11,19 @@ async def test_user_registration_is_successful(client):
     assert response_body["username"] == username
     assert "hashed_password" not in response_body
 
+async def test_400_when_username_already_taken(client):
+    username = "test_user"
+    json_body ={
+        "username": username,
+        "password": "pass1234"
+        }
+    response = await client.post(url="/register", json=json_body)
+    assert response.status_code == 200
+    dupe_username = await client.post(url="/register", json=json_body)
+    assert dupe_username.status_code == 400
+    dupe_username_json = dupe_username.json()
+    assert dupe_username_json["detail"] == "Username already taken"
+
 async def test_login_successful_with_valid_credentials(client):
     username = "test_user"
     json_body ={
