@@ -1,3 +1,5 @@
+from app.auth import create_access_token
+
 async def test_user_registration_is_successful(client):
     username = "test_user"
     json_body ={
@@ -81,6 +83,21 @@ async def test_indistinguishable_messaging_for_invalid_username_or_password(clie
     response2 = await client.post(url="/login", json=json_body_wrong_username)
     assert response.json() ==response2.json()
     assert response.status_code == response2.status_code
+
+async def test_invalid_token_payload_on_get_current_user(client):
+    token = create_access_token({"user": None})
+    response = await client.get("/items",headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code ==401
+    response_json = response.json()
+    assert response_json["detail"] == "Invalid token payload"
+
+
+async def test_user_not_found_on_get_current_user(client):
+    token = create_access_token({"sub":"missing_user"})
+    response = await client.get("/items",headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code ==401
+    response_json = response.json()
+    assert response_json["detail"] == "User not found"
 
 async def test_401_when_header_is_invalid_token(client):
     get_item = await client.get("/items/1", headers={"Authorization":"Bearer bad_token"})
