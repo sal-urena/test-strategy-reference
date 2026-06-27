@@ -1,12 +1,7 @@
 # Test Strategy — Reference API SUT
 
-<!-- Guidance prompts are in HTML comments so they won't render on GitHub if you miss one.
-     Delete each comment as you replace it with your own prose. -->
-
 ## 1. Purpose & scope
-
-<!-- One paragraph: this repo is a SUT; the suite + this doc are the deliverable.
-     State what "done" means, and what this doc is NOT (not a test catalog). -->
+This repository contains a FastAPI system under test and the associated test layers. The deliverable for it is the testing suite and test strategy document outlining the testing strategy for this project, not a test catalog.
 
 ## 2. The testing pyramid, applied to this app
 
@@ -34,29 +29,15 @@ test_hash_password_over_boundary
 - This unit test confirms that bcrypt now returns a ValueError when going over 72 bytes instead of silently truncating
 
 ### 3.2 API layer (`tests/api/`)
-
-<!-- Intro paragraph (your prose): this layer drives the real routes over httpx with the DB
-     overridden — real request in, real response out. Contrast with 3.1: a unit test isolates a
-     pure function; an API test exercises the whole stack (HTTPBearer → handler → DB session).
-     State the current count if you want it (17 green at time of writing). -->
+This section outlines the testing done at the API layer. We are using httpx to perform async tests of the endpoints in this SUT. The API tests validate the code of the full endpoint as opposed to the unit tests which only test isolated functionality.
 
 #### What this layer covers — and why each is an API concern, not a unit one
-
-<!-- For each bullet: one line on the behavior, one line on why it CAN'T live in the unit layer
-     (needs the HTTP stack and/or a real DB session — there's no pure function to call). -->
-
-- **Owner-scoped 404** — another user's item returns 404, not 403 (existence-denial / no id-enumeration oracle).
-  <!-- Why API: owner-scoping is a property of the route + DB lookup, not a pure function. -->
+- **Owner-scoped 404** — another user's item returns 404, not 403 (existence-denial / no id-enumeration oracle). This is at the API layer since owner scoping requires item creation in a database so cannot be tested at the pure unit layer. 
 - **Uniform 401, distinguished by layer not status** — missing/wrong-scheme header → 401 `"Not authenticated"`
   (rejected by `HTTPBearer` before any handler); present-but-bad/expired token → 401 `"Invalid or expired token"`
-  (inside `get_current_user`).
-  <!-- Why API: the distinction only exists once requests pass through the two guard layers.
-       NOTE the real-framework finding: this FastAPI version returns 401 (not the old 403) on a
-       missing header — distinction moved from status code to detail + layer. -->
-- **Forged `owner_id` is ignored** — server stamps `owner_id` from the token; an `owner_id` in the body has no effect.
-  <!-- Why API: only observable end-to-end (POST a forged body, assert the returned owner == the actor). -->
-- **Login uniformity** — bad username and bad password are indistinguishable across body AND status (no enumeration oracle).
-  <!-- Why API: it's an assertion about two real HTTP responses being identical. -->
+  (inside `get_current_user`). By verifying the specific 401 message we can verify that we tested all three versions of the error handling and are not masking a bug by only capturing the first in the chain.
+- **Forged `owner_id` is ignored** — server stamps `owner_id` from the token; an `owner_id` in the body has no effect. This can only be tested at API level since the owner_id is stamped in the db and the reading of the endpoint body is handled in the API endpoint.
+- **Login uniformity** — bad username and bad password are indistinguishable across body AND status (no enumeration oracle). This test is important as it ensures bad actors are prevented from testing the system for usernames by having uniform messaging on both bad usernames and passwords.
 
 #### The isolation rig — three decisions (the architecturally interesting part)
 
@@ -66,14 +47,13 @@ test that hits a route writes to the committed DB and fails on rerun (e.g. `/reg
 taken" the second time). Each decision below is a countermeasure.
 
 1. **In-memory SQLite + `StaticPool`** (`session` fixture)
-   <!-- Your prose: a fresh per-test in-memory engine means every test starts from a known-empty DB. -->
+   We created a fresh database in memory for each test so that each can be run in isolation.
    - Why `StaticPool` *specifically*: plain `sqlite://` hands each connection its own separate in-memory DB,
      so the tables the fixture creates are invisible to the connection the request runs on.
    - **Failure-if-you-don't:** confusing "empty DB" failures — tables exist in the fixture, gone in the request.
 
 2. **`app.dependency_overrides[get_session]`** (`client` fixture)
-   <!-- Your prose: the override is a closure that yields the test session; FastAPI swaps it in for the real
-        get_session for the duration of the test. -->
+   The override closure directs the calls to the SUT to our instanced db session for testing.
    - Why an override and not monkeypatching the engine: `dependency_overrides` is FastAPI's first-class seam
      and respects the generator-dependency lifecycle.
    - **Teardown blast radius (from the conftest review):** `.clear()` wipes *every* override, not just the one
@@ -88,9 +68,7 @@ taken" the second time). Each decision below is a countermeasure.
    - Plumbing it needs: `pytest-asyncio` with `asyncio_mode = auto`.
 
 #### The authenticated-client factory (`make_user`)
-
-<!-- Your prose: why this is a *factory* fixture (returns an inner async fn) and not a plain fixture. -->
-
+This fixture is used to create an async function to create users in the instanced database created for the test.
 - Composes to **N users** — `alice = await make_user(...)`, `bob = await make_user(...)` — which is what the
   two-user owner-scope tests require.
 - Returns an identity-rich `AuthedUser(id, headers)` so a test can assert the returned owner == the actor.
@@ -100,53 +78,39 @@ taken" the second time). Each decision below is a countermeasure.
   the correct signal that the test never reached the behavior under test.
 
 ## 4. Where a bug lands (unit vs API) — worked examples
+Example 1: User Authentication
+In a situation where the hash_password function was changed to introduce a bug such as the password not hashing and instead storing as plaintext, the unit tests would catch this at the pure functionality level. However, an API test would still pass in the case that the verify_password function was comparing plaintext to plaintext.
 
-<!-- The section that proves you understand boundaries, not just that you can write tests.
-     2–3 concrete bugs, each routed to its layer:
-       - token-expiry logic breaks → unit
-       - broken owner-scope → API
-       - (pick a third) -->
+Example 2: Item Ownership
+The database storage of item ownership can only be tested through the API since there is no pure function that establishes this. If for example, the "/items" route was broken so that it no longer verified the item ownership to the user, the API tests would surface this but there would be no way to directly test this at the unit test level.
+
+Example 3: Expired tokens
+The testing of the decode_access_token in the situation of an expired token is handled solely at the unit test level since we can test that cleanly by generating an expired token then testing the functionality. The expired token is a purely functional feature and requires no database or HTTP to access it. A test at the API level would instead focus on testing the error handling and would be validating a different piece of functionality. Keeping the test at the unit level makes it the purest version of the test. 
+
 
 ## 5. Test data & isolation
-
-<!-- Keep this section at the GUARANTEE altitude. The mechanism (StaticPool, per-test engine,
-     dependency_overrides) lives in §3.2 — reference it here, don't re-explain it. -->
+Each run of the test suite runs against a clean environment. For each unit test, it is a functional test in isolation and focused on testing only one outcome at a time. For the API tests a fresh database is created in memory using a test fixture. This ensures that all tests run cleanly and no unexpected data can impact the outcome.
 
 #### The isolation guarantee
-
-<!-- Your prose: every test starts from a known DB state — a fresh, empty in-memory DB per test,
-     torn down after. State it as a guarantee the reader can rely on, then point at §3.2 for HOW
-     it's enforced (the StaticPool + override rig). One or two sentences, no plumbing here. -->
+The database is made cleanly using a session fixture that overrides and directs the API calls to this in memory database. We use static pool to ensure all connections in a given run share the same database.
 
 #### Why fixtures live at the API layer, not the unit layer
-
-<!-- Your prose: the unit layer is pure functions — no HTTP, no DB, so nothing to isolate and no
-     fixtures (3.1 already says this). Isolation only becomes a problem once a test touches the
-     module-level engine, which is the API layer. So the fixtures exist exactly where the shared
-     mutable state is, and nowhere else. -->
+We have fixtures in the API layer to facilitate isolated testing. By generating our instanced session, client and users we can ensure isolation in our tests. This is not required at the unit test level since it is purely functional testing.
 
 #### Test data approach
+The unit tests use simple string variables for their testing since that is all that is required to test their pure functionality. 
 
-<!-- Your prose: how test data is shaped at each layer.
-       - Unit layer: plain values / string constants passed straight to the function.
-       - API layer: JSON payload dicts posted to the endpoints (e.g. the register/login body),
-         and identities built through the make_user factory rather than seeded into the DB by hand.
-     Note WHY you build users via the real endpoints instead of inserting rows: the data arrives
-     through the same auth path the SUT actually uses (no divergence between test setup and reality). -->
+The API tests require the use of string variables as well as dictionaries of the API payloads. We also use a make_user factory fixture to generate test users in the isolated session for each test run.
 
 ## 6. Considered but out of scope (and why)
-
-<!-- The senior move. Map the rest of the pyramid and mark each:
-       - DB/persistence-layer tests → covered transitively by the API layer; testing the framework
-       - E2E / UI → no UI; the API layer IS the end-to-end here
-       - full CI wiring → how you'd gate it, not built yet
-     Knowing what to leave out — and saying so — is the point. -->
+For this test example we are leaving out the following testing focuses as it is out of scope for this demo.
+- Database persistence: We are testing using fresh databases so do not test the persistence of data in a real database
+- UI testing - The SUT is solely an API-driven application with no UI so end to end testing would not be required for this application.
 
 ## 7. Future layers (roadmap)
+- Mutation testing (mutmut). Mutation testing will ensure that the test suite will actually catch bugs if they occur by introducing small bugs into the code and verifying the tests fail. This is ideal for running on our unit tests to make sure they carry their weight.
+- Schemathesis - This tool tests the API contract off of the OpenAPI schema. While the http tests catch what I explicitly write, the tool catches the edge cases that aren't covered and catches contract drift. 
+- Security testing using Bandit. There is a built-in security error already set up with the committed secret in the auth.py module. 
+- k6 - Performance testing. This tool simulates a customizable load on the API endpoints to ensure functionality under load.
+- CI/CD pipeline. Set up the CI/CD pipeline with the above tests as gates to be deployed with GitHub Actions.
 
-<!-- Brief, ranked, one line each:
-       - mutation testing (mutmut) — top differentiator: "coverage shows what ran,
-         mutation shows whether assertions mean anything"
-       - Schemathesis — contract/property testing off /openapi.json
-       - Bandit — static security scan; will flag the planted hardcoded SECRET_KEY
-       - k6 — performance, Phase 2 -->
