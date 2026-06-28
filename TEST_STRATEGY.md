@@ -77,6 +77,18 @@ This fixture is used to create an async function to create users in the instance
 - Asserts `200` on both legs inside the helper: a setup failure surfaces as a pytest *error*, not a *failure* —
   the correct signal that the test never reached the behavior under test.
 
+## 3.3 Security Layer (bandit)
+Security is tested using bandit to review the code base for potential security issues. It finds three results, one that was intentionally planted and two additional findings.  The findings were then triaged and updated accordingly. The key call out with Bandit's reports is that all results must still be reviewed by a human to verify its authenticity and true severity. 
+
+**KEY Call outs**
+Security finding 1: auth.py line 5. It flags this as a low severity potential stored password. This is actually a high security risk because it is the secret used to generate tokens and bad actors would be able to mint their own tokens with it.  This was deliberately placed in the system for demo purposes. We then created a bandit baseline so we can ignore it in CI runs. In the real world, we would have to address this issue and would never put it in baseline as this should be a hard gate for deployment. 
+
+Security finding 2: main.py line 45. Bandit flags bearer as a possible password. No security risk as bearer is a Auth token type so we use a nosec comment to ignore the warning. There is a cosmetic issue where bandit is giving a warning that there is nothing to ignore on this line. This is possibly because of the multi key dict causing issues with the nosec-usage tracker. 
+
+Security finding 3: main.py line 74. Bandit flags the use of an assert which would be stripped out at compile. There is no risk in this situation since the assert is there to silence a Pylance error and its removal has no impact on the code. This would only be an issue if the assert was being used in code for security reasons. This is also ignored using a nosec. 
+
+Security issues 1 is a true finding and I use baseline to allow us to still deploy in CI but we don't want to ignore it since it is a valid finding. Finding 2 and 3 are not issues so we ignore it at the code level with nosec as we do not want them showing up in any reporting. 
+
 ## 4. Where a bug lands (unit vs API) — worked examples
 Example 1: User Authentication
 In a situation where the hash_password function was changed to introduce a bug such as the password not hashing and instead storing as plaintext, the unit tests would catch this at the pure functionality level. However, an API test would still pass in the case that the verify_password function was comparing plaintext to plaintext.
@@ -110,7 +122,6 @@ For this test example we are leaving out the following testing focuses as it is 
 ## 7. Future layers (roadmap)
 - Mutation testing (mutmut). Mutation testing will ensure that the test suite will actually catch bugs if they occur by introducing small bugs into the code and verifying the tests fail. This is ideal for running on our unit tests to make sure they carry their weight.
 - Schemathesis - This tool tests the API contract off of the OpenAPI schema. While the http tests catch what I explicitly write, the tool catches the edge cases that aren't covered and catches contract drift. 
-- Security testing using Bandit. There is a built-in security error already set up with the committed secret in the auth.py module. 
 - k6 - Performance testing. This tool simulates a customizable load on the API endpoints to ensure functionality under load.
 - CI/CD pipeline. Set up the CI/CD pipeline with the above tests as gates to be deployed with GitHub Actions.
 

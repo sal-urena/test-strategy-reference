@@ -42,7 +42,7 @@ def login(credentials: UserCreate, session: Session = Depends(get_session)):
         raise HTTPException(status_code=401, detail="Invalid username or password")
 
     token = create_access_token({"sub":user.username})
-    return {"access_token":token, "token_type":"bearer"}
+    return {"access_token":token, "token_type":"bearer"} # nosec B105 # public OAuth2 token type (RFC 6750), not a secret
 
 def get_current_user(
         creds: HTTPAuthorizationCredentials = Depends(security),
@@ -71,7 +71,7 @@ def create_item(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    assert current_user.id is not None
+    assert current_user.id is not None # nosec B101 # assert it to bypass Pylance error. No risk introduced when removed at compile
     db_item = Item(
         name=item.name,
         description=item.description,
