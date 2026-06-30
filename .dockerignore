@@ -1,0 +1,24 @@
+# VCS
+.git
+.gitignore
+
+# Python caches / local virtualenv
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.coverage
+
+# Real SQLite file — never bake committed/local DB state into the image
+# (the test-DB isolation trap: tests override to in-memory SQLite, so the
+# image needs no .db file at all)
+*.db
+
+# Local AI dev tooling — not part of the deliverable
+.claude
+CLAUDE.md
+
+# CI / container meta — not needed inside the image
+.github
+Dockerfile
+.dockerignore

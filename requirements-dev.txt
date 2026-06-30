@@ -1,0 +1,7 @@
+# Runtime deps + the test/SAST tooling. Dev is a strict superset of prod.
+-r requirements.txt
+
+httpx
+pytest
+pytest-asyncio
+bandit
